@@ -17,6 +17,23 @@ sets otherwise.
 ## Running the Implementations
 
 
+## Coaching Graph Files
+
+Coaching graphs are provided in JSON format.
+Two attributes are provided: `users` which is an array of user names;
+and `coaches` which is a dictionary with user names as keys and 
+arrays of users they coach for values. A simple example with four
+users, one of which is the coach, is shown below.
+
+```json
+{
+    "users": [ "A", "B", "C", "D" ],
+    "coaches": {
+        "A": [ "B", "C", "D" ]
+    }
+}
+```
+
 ## User Model
 
 The original problem description states:
@@ -28,34 +45,51 @@ Note that infections are transitive ­ if B coaches C, then C should
 get the new feature as well. Also, infections are transferred by
 both the "coaches" and "is coached by" relations.
 
-Because infections are transferred by "coaches" and "is coached by"
-relations, an **undirected graph** is used to model the complete
-set of relationships. For example, if a student is chosen for initial
-infection, their teacher(s) will be infected in the same way that
-initially infecting a teacher will infect their student(s).
-
-It is important to note that in general, undirected graphs might
-consist of several **connected components**. It is possible that
-a component consists of a single, lonely student or teacher.
-Alternatively, everyone could be connected, by some path of
-coaching relationships, to everyone else.
-
-An individual user is modeled as a list of web site features
+An individual user is modeled as a node in a directed graph,
+with outgoing edges representing "coaches" relationships,
+and incoming edges representing "is coached by" relationships.
+Furthermore, users store sets of web site features
 that they currently have, which defines the version of the site
-they see. In a very controlled setting, a more limited number
+they see.  In a very controlled setting, a more limited number
 of feature combinations might be allowed and defined by a simple
 identifier. To keep the code simple, features are implemented as
 strings.
 
 ```python
-class User:
-    """A user of the system"""
-    def __init__(self):
-        """Construct and initialize a user of the web site."""
-        self.features = []
-        self.coaches = []
-        self.coached_by = []
+class User(graph.Node):
+    """Model users as graph nodes with some special methods."""
+
+    def __init__(self, id, features=set()):
+        """Initialize a user with a set of features."""
+        _features = set() | features
+        super(User, self).__init__(id, _features)
+
+    def features(self):
+        """Return the features this user has."""
+        return self.data()
+
+    def add_feature(self, feature):
+        """Add a web site feature to this user."""
+        self.data().add(feature)
+
+    def discard_feature(self, feature):
+        """Discard a feature from this user."""
+        self.data().discard(feature)
+
+    def coaches(self):
+        """Return the set of users this user coaches"""
+        return self.outgoing()
+
+    def is_coached_by(self):
+        """Return the set of users this user is coached by"""
+        return self.incoming()
 ```
+
+It is important to note that in general, directed graphs might
+consist of several **weakly connected components**. It is possible that
+a component consists of a single, lonely student or teacher.
+Alternatively, everyone could be weakly connected, by some path of
+"coaches" and "is coached by" relationships, to everyone else.
 
 ## Total Infection
 
@@ -64,11 +98,23 @@ The original problem statement states:
 > Starting from any given user, the entire connected component of
 the coaching graph containing that user should become infected.
 
+Since a directed graph is used to model the coaching graph,
+and infection is spread by "coaches" and "is coached by" relationships,
+the **weakly connected component** containing the initial user
+is found. All nodes in the component are infected with the feature.
+As a slight extension, if a feature starts with an exclamation point (!),
+the infection discards the feature.
+
 ```python
-def total_infection(initial_user, feature):
-    """Infect the connected component containing the initial_user with
-       the specified feature.
-    """
+def total_infection(coaching_graph, initial_user_id, feature):
+    """Totally infect a coaching graph with a feature from the initial user"""
+    infected = coaching_graph.connected_component(initial_user_id)
+    discard = feature.startswith("!")
+    for user in infected:
+        if discard:
+            user.discard_feature(feature[1:]) # strip the leading !
+        else:
+            user.add_feature(feature)
 ```
 
 ## Limited Infection
