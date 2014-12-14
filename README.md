@@ -76,6 +76,13 @@ class User(graph.Node):
         """Discard a feature from this user."""
         self.data().discard(feature)
 
+    def update_feature(self, feature):
+        """Adds or discards a feature. Discards if feature starts with !"""
+        if feature.startswith("!"):
+            self.discard_feature(feature[1:]) # remove the leading !
+        else:
+            self.add_feature(feature)
+
     def coaches(self):
         """Return the set of users this user coaches"""
         return self.outgoing()
@@ -83,13 +90,9 @@ class User(graph.Node):
     def is_coached_by(self):
         """Return the set of users this user is coached by"""
         return self.incoming()
+
 ```
 
-It is important to note that in general, directed graphs might
-consist of several **weakly connected components**. It is possible that
-a component consists of a single, lonely student or teacher.
-Alternatively, everyone could be weakly connected, by some path of
-"coaches" and "is coached by" relationships, to everyone else.
 
 ## Total Infection
 
@@ -119,29 +122,62 @@ def total_infection(coaching_graph, initial_user_id, feature):
 
 ## Limited Infection
 
-Total infection provides limited control over the proportion
-of the coaching graph that will be infected. A second part
-of the original problem states:
+Because of the graph structure total infection provides limited
+control over the proportion of the coaching graph that will be
+infected.  In general, directed graphs might have several
+**weakly connected components**. It is possible that a component
+consists of a single, lonely student or teacher (we don't really
+know which).  Alternatively, everyone could be weakly connected,
+by some path of "coaches" and "is coached by" relationships, to
+everyone else. This is suggested by the statement:
+
+> Starting an infection could cause only that person to become
+infected or at the opposite (unrealistic) extreme it could cause
+all users to become infected.
+
+The second part of the original problem states:
 
 > We would like to be able to infect close to a given number of
 users. Ideally we’d like a coach and all of their students to either
 have a feature or not. However, that might not always be possible.
 
+> Implement a procedure for limited infection.
+
+A few design decisions are made:
+* An acceptable range of users to infect is specified. It is assumed
+  the minimum and maximum number of users is provided correctly.
+* Infecting whole components first is desirable. This keeps all coaches
+  and students in sync with their feature sets. This process continues
+  until the acceptable range is achieved or it is not possible to
+  add a component and remain within the range.
+* If infecting whole components does not get within
+  the desired range of infected users, 
+  then partial infections will take place.
+  Partial infections start with coaches and ignore transitivity 
+  and "is coached by" relationships until
+  getting within the range is achieved 
+  or it is determined to not be possible.
+  Partial infections aim to keep individual classes in sync.
+  It is assumed that a user with two coaches is in two different
+  classes, and that a user that is both a coach and being coached
+  has those relationships in two different classes.
+  Users may be more accepting of different features in different classes.
+* If it is not possible to infect an acceptable range of users,
+  by first infecting whole components then employing partial infection,
+  the function will not perform the infection and fail.
+  This may fail, even though partial infection on its own could succeed.
+
 ```python
-def limited_infection(graph, feature, num_users, tolerance):
+def limited_infection(graph, feature, min_users, max_users):
     """Infect close to a given number of users in the coaching graph."""
 ```
 
-Some requirements for limited infection:
-* If the number of users to infect is > 0, then at least some users
-  must be infected.
+We could employ the rules of partial infection all the time,
+and try prioritizing classes through transitivity and "is coached by"
+relationships, to try to fill in whole components first.
 
-Some options for limited infection:
-
-* Find all connected components. Search for the collection of
-  components that gets closest to the desired number.
-* Find all components. If the smallest component is larger than the
-  number of users, consider breaking up classes.
+Rather than keep a queue of all nodes, only queue up coaches. (What about
+singletons? Treat them as coaches, maybe.)
 
 ## Optional: Exact Limited Infection
 
@@ -151,7 +187,8 @@ One of the optional assignments is to
 of users specified and fails if that's not possible (this can be (really)
 slow)
 
-This assignment is essentially a form of the 
+If it is assumed that this means only whole components are infected,
+this assignment is essentially a form of the 
 (subset sum problem)[http://en.wikipedia.org/wiki/Subset_sum_problem],
 where the multiset of integers consists
 of the sizes of the connected components

@@ -29,6 +29,13 @@ class User(graph.Node):
         """Discard a feature from this user."""
         self.data().discard(feature)
 
+    def update_feature(self, feature):
+        """Adds or discards a feature. Discards if feature starts with !"""
+        if feature.startswith("!"):
+            self.discard_feature(feature[1:]) # remove the leading !
+        else:
+            self.add_feature(feature)
+
     def coaches(self):
         """Return the set of users this user coaches"""
         return self.outgoing()
@@ -40,12 +47,8 @@ class User(graph.Node):
 def total_infection(coaching_graph, initial_user_id, feature):
     """Totally infect a coaching graph component with a feature"""
     infected = coaching_graph.connected_component(initial_user_id)
-    discard = feature.startswith("!")
     for user in infected:
-        if discard:
-            user.discard_feature(feature[1:]) # strip the leading !
-        else:
-            user.add_feature(feature)
+        user.update_feature(feature)
 
 def subset_sum(sizes, target, i, n, subtotal):
     """Solve the subset sum problem recursively."""
@@ -71,7 +74,7 @@ def exact_limited_infection(coaching_graph, num_users, feature):
     if solution != False:
         for i in solution:
             for user in components[i]:
-                user.add_feature(feature)
+                user.update_feature(feature)
         return True
     else:
         return False
@@ -120,6 +123,18 @@ def main(graph_file):
 
     total_infection(coaching_graph, "D", "!points")
     print_user_features(coaching_graph)
+
+    success = exact_limited_infection(coaching_graph, 10, "points")
+    if not success:
+        print "Infection failed"
+    else:
+        print_user_features(coaching_graph)
+    
+    success = exact_limited_infection(coaching_graph, 4, "points")
+    if not success:
+        print "Infection failed"
+    else:
+        print_user_features(coaching_graph)
 
 # Execute main script if this file is called for execution
 if __name__ == "__main__":
