@@ -7,7 +7,8 @@ __version__ = '1'
 
 import graph # Our basic graph implementation
 import json
-from optparse import OptionParser
+from collections import deque
+from argparse import ArgumentParser
 
 class User(graph.Node):
     """Model users as graph nodes with some special methods."""
@@ -44,20 +45,126 @@ class User(graph.Node):
         """Return the set of users this user is coached by"""
         return self.incoming()
 
-def total_infection(coaching_graph, initial_user_id, feature):
+def total_infection(coaching_graph, feature, initial_user_id):
     """Totally infect a coaching graph component with a feature"""
     infected = coaching_graph.connected_component(initial_user_id)
     for user in infected:
         user.update_feature(feature)
 
-def subset_sum(sizes, target, i, n, subtotal):
+def trim_infections(infections, delta):
+    """Trim the list of infections so that they are a factor of delta apart."""
+
+    trimmed = [infections[0]] # Should always be the empty set.
+    y = [float(len(x)) for x in infections]
+    last = y[0]
+    for i in range(1,len(y)):
+        if y[i] > last * (1.0 + delta):
+            trimmed.append(infections[i])
+            last = y[i]
+
+    return trimmed
+
+def approx_component_infection(coaching_graph, min_users, max_users):
+    """Find a collection of components to infect, getting to min_users."""
+
+    # This uses an approach similar to the approximate subset sum
+    # algorithm. A list of potentially acceptable collections is
+    # maintained, removing any that get too large and trimming
+    # infections that are too close in size. This approach is
+    # guaranteed to find at least one infection within the range
+    # if one exists.
+    #
+    # The speed of this approach depends on the min and max number 
+    # of users. The bigger the range, the faster this is likely to be.
+    # The closer we're required to be to the exact answer, the more 
+    # candidate infections need to be maintained (i.e. less trimming 
+    # allowed) and the more memory is used as well.
+    seeds = coaching_graph.all_connected_components()
+    epsilon = (float(max_users) / min_users) - 1.0
+    n = len(seeds)
+
+    infections = [set()] # Start with the empty set
+    for seed in seeds:
+        new_infections = [x | set(seed) for x in infections]
+        new_infections = filter(lambda x : len(x) <= max_users, new_infections)
+        infections.extend(new_infections)
+        infections.sort(key=lambda x : len(x))
+        infections = trim_infections(infections, epsilon / (2.0 * n))
+
+    return infections.pop()
+
+
+def approx_class_infection(coaching_graph, seeds, min_users, max_users):
+    """Find a collection of users to infect, starting with seeds"""
+
+    # This uses an approach similar to the approximate subset sum
+    # algorithm. A list of potentially acceptable collections is
+    # maintained, removing any that get too large and trimming
+    # infections that are too close in size. This approach is
+    # guaranteed to find at least one infection within the range
+    # if one exists.
+    #
+    # The speed of this approach depends on the min and max number 
+    # of users. The bigger the range, the faster this is likely to be.
+    # The closer we're required to be to the exact answer, the more 
+    # candidate infections need to be maintained (i.e. less trimming 
+    # allowed) and the more memory is used as well.
+    epsilon = (float(max_users) / min_users) - 1.0
+    n = len(seeds)
+
+    infections = [set()] # Start with the empty set
+    for seed in seeds:
+        new_infections = [x | set([seed]) | set(seed.coaches()) 
+                for x in infections]
+        new_infections = filter(lambda x : len(x) <= max_users, new_infections)
+        infections.extend(new_infections)
+        infections.sort(key=lambda x : len(x))
+        infections = trim_infections(infections, epsilon / (2.0 * n))
+
+    return infections.pop()
+
+def limited_infection(coaching_graph, feature, min_users, max_users):
+    """Perform a limited infection, between minimum and maximum users.
+
+    Limited infections first infect entire components then infect
+    classes, starting with coaches and their students (ignoring
+    transitivity and "is coached by" relationships). If a limited infection
+    exists between the minimum and maximum number of users (inclusive), 
+    it will be performed.
+    
+    Returns True if the infection was successful, False otherwise.
+    """
+
+    users = approx_component_infection(coaching_graph, min_users, max_users)
+    if len(users) < min_users:
+        # Component infection didn't infect enough users. Move to class
+        # infections.
+        seeds = coaching_graph.all_parents() | coaching_graph.all_singletons()
+        seeds -= users # Remove already infected users.
+        min_class_users = min_users - len(users)
+        max_class_users = max_users - len(users)
+        class_users = approx_class_infection(coaching_graph, seeds, 
+                min_class_users, max_class_users)
+        users |= class_users
+
+    if len(users) >= min_users:
+        for user in users:
+            user.update_feature(feature)
+        return True
+
+    return False
+
+def exact_subset_sum(sizes, target, i, n, subtotal):
     """Solve the subset sum problem recursively."""
     if subtotal == target:
         return [i]
+    elif subtotal > target:
+        # Optimization. Stop considering this possible solution.
+        return False
 
     j = i + 1
     while j < n:
-        ret = subset_sum(sizes, target, j, n, subtotal + sizes[j])
+        ret = exact_subset_sum(sizes, target, j, n, subtotal + sizes[j])
         if ret != False:
             if i > -1:
                 ret.append(i)
@@ -66,11 +173,11 @@ def subset_sum(sizes, target, i, n, subtotal):
 
     return False
 
-def exact_limited_infection(coaching_graph, num_users, feature):
+def exact_limited_infection(coaching_graph, feature, num_users):
     """Infect a specified number of users exactly in a coaching graph."""
     components = coaching_graph.all_connected_components()
     sizes = [len(x) for x in components]
-    solution = subset_sum(sizes, num_users, -1, len(sizes), 0)
+    solution = exact_subset_sum(sizes, num_users, -1, len(sizes), 0)
     if solution != False:
         for i in solution:
             for user in components[i]:
@@ -79,7 +186,7 @@ def exact_limited_infection(coaching_graph, num_users, feature):
     else:
         return False
 
-def json_graph_to_coaching_graph(graph_file):
+def json_file_to_coaching_graph(graph_file):
     """Convert JSON encoded graph to a coaching graph."""
     graph_data = json.load( open(graph_file) )
     coaching_graph = graph.Graph(directed=True)
@@ -97,7 +204,38 @@ def json_graph_to_coaching_graph(graph_file):
             student = coaching_graph.find_node(student_id)
             coaching_graph.add_edge(coach, student)
 
+    # Add features to users if available
+    if "features" in graph_data:
+        features = graph_data["features"]
+        for user_id in features.keys():
+            user = coaching_graph.find_node(user_id)
+            for feature in features.values():
+                user.add_feature(feature)
+
     return coaching_graph
+
+def coaching_graph_to_json_file(coaching_graph, graph_file):
+    """Convert a coaching graph to a JSON file."""
+
+    output = dict()
+    # users
+    output['users'] = [x.id() for x in coaching_graph.nodes()]
+
+    # coaching relationships
+    coaches = coaching_graph.all_parents()
+    coaching = dict()
+    for coach in coaches:
+        coaching[coach.id()] = [x.id() for x in coach.coaches()]
+    output['coaches'] = coaching
+
+    # Features for users
+    features = dict()
+    for user in coaching_graph.nodes():
+        features[user.id()] = list(user.features())
+    output['features'] = features
+
+    # Output to a file
+    json.dump(output, open(graph_file, "w"), indent=4)
 
 def print_user_features(coaching_graph):
     """Print the features each user of coaching_graph has"""
@@ -105,43 +243,46 @@ def print_user_features(coaching_graph):
     for user in coaching_graph.nodes():
         print "User %s has features %s" % (user.id(), user.features())
 
-
-def main(graph_file):
+def main(args):
     """Main script to execute"""
 
-    coaching_graph = json_graph_to_coaching_graph(graph_file)
-    print coaching_graph
+    coaching_graph = json_file_to_coaching_graph(args.infilename)
 
-    total_infection(coaching_graph, "A", "login")
-    print_user_features(coaching_graph)
+    if args.total_infection:
+        total_infection(coaching_graph, args.feature, args.total_infection)
 
-    total_infection(coaching_graph, "B", "points")
-    print_user_features(coaching_graph)
+    if args.limited_infection:
+        limited_infection(coaching_graph, args.feature, 
+                args.limited_infection[0], args.limited_infection[1])
 
-    total_infection(coaching_graph, "M", "home")
-    print_user_features(coaching_graph)
+    if args.exact_infection:
+        exact_limited_infection(coaching_graph, args.feature, 
+                args.exact_infection)
 
-    total_infection(coaching_graph, "D", "!points")
-    print_user_features(coaching_graph)
+    coaching_graph_to_json_file(coaching_graph, args.outfilename)
 
-    success = exact_limited_infection(coaching_graph, 10, "points")
-    if not success:
-        print "Infection failed"
-    else:
-        print_user_features(coaching_graph)
-    
-    success = exact_limited_infection(coaching_graph, 4, "points")
-    if not success:
-        print "Infection failed"
-    else:
-        print_user_features(coaching_graph)
 
 # Execute main script if this file is called for execution
 if __name__ == "__main__":
-    usage = "usage: %prog filename"
-    parser = OptionParser(usage)
-    (options, args) = parser.parse_args()
-    if len(args) != 1:
-        parser.error("missing output file name")
+    parser = ArgumentParser(description="Infect a coaching graph.")
+    parser.add_argument('feature', 
+            help="infect the graph with this feature")
+    parser.add_argument('infilename',  
+            help="input file containing coaching graph")
+    parser.add_argument('outfilename',
+            help="output file containing infected graph")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-e", "--exact-infection", 
+            type=int,
+            metavar='NUM',
+            help="infect exactly NUM users if possible")
+    group.add_argument("-l", "--limited-infection", nargs=2, 
+            type=int,
+            metavar=('MIN', 'MAX'),
+            help="infect MIN to MAX users if possible")
+    group.add_argument("-t", "--total-infection", 
+            metavar='USER',
+            help="totally infect the component containing USER")
+    args = parser.parse_args()
 
-    main(args[0])
+    main(args)

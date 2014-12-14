@@ -60,6 +60,14 @@ class Node(object):
         """Update the data in this node"""
         self._data = data
 
+    def is_parent(self):
+        """Return whether or not this node has outgoing edges"""
+        return len(self._outgoing) > 0
+
+    def is_singleton(self):
+        """Return whether or not this node has no neighbors"""
+        return len(self.neighbors()) == 0
+
 class Graph(object):
     """A representation of graphs as a collection of nodes."""
 
@@ -149,3 +157,15 @@ class Graph(object):
             components.append(component)
 
         return components
+
+    def all_parents(self):
+        """Return a list of nodes that are parents."""
+
+        return set(filter(lambda x : x.is_parent(), 
+            self._nodes.itervalues()))
+
+    def all_singletons(self):
+        """Return a list of singleton nodes."""
+
+        return set(filter(lambda x : x.is_singleton(), 
+            self._nodes.itervalues()))

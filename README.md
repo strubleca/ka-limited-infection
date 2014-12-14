@@ -16,6 +16,54 @@ sets otherwise.
 
 ## Running the Implementations
 
+The code was written in Python using Python v2.7.8. The files are
+
+* `graph.py` general graph routines.
+* `infect.py` infection routines and main script.
+* `infect_test.py` unit tests for graph and infection routines.
+* `graphs/*.json` sample coaching graphs
+
+The usage message for `infect.py` is
+
+```
+usage: infect.py [-h] [-e NUM | -l MIN MAX | -t USER]
+                 feature infilename outfilename
+
+Infect a coaching graph.
+
+positional arguments:
+  feature               infect the graph with this feature
+  infilename            input file containing coaching graph
+  outfilename           output file containing infected graph
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -e NUM, --exact-infection NUM
+                        infect exactly NUM users if possible
+  -l MIN MAX, --limited-infection MIN MAX
+                        infect MIN to MAX users if possible
+  -t USER, --total-infection USER
+                        totally infect the component containing USER
+```
+
+Sample executions are:
+
+```bash
+# Total infection with pop_quiz feature starting at node A
+python infect.py -t A pop_quiz graphs/graph1.json graphs/infected1.json
+
+# Limited infection with exam feature for between 4 and 8 users
+python infect.py -l 4 8 exam graphs/graph2.json graphs/infected2.json
+
+# Exact infection with prize feature for 9 users
+python infect.py -e 9 prize graphs/graph3.json graphs/infected3.json
+```
+
+To run the unit tests:
+
+```bash
+python infect_test.py
+```
 
 ## Coaching Graph Files
 
@@ -30,6 +78,39 @@ users, one of which is the coach, is shown below.
     "users": [ "A", "B", "C", "D" ],
     "coaches": {
         "A": [ "B", "C", "D" ]
+    }
+}
+```
+
+Coaching graphs may contain an optional `features` attribute,
+providing the features each user has in a dictionary. This is
+useful for seeing what happens after infecting a graph.
+For example, after a total infection of the small component, the following
+is obtained for `graphs/graph3.json`.
+
+```json
+{
+    "coaches": {
+        "A": [ "C", "B", "D" ], 
+        "J": [ "K", "L", "M" ], 
+        "B": [ "E", "F", "G" ], 
+        "E": [ "I", "H" ]
+    }, 
+    "users": [ "A", "C", "B", "E", "D", "G", "F", "I", "H", "K", "J", "M", "L" ], 
+    "features": {
+        "A": [], 
+        "C": [], 
+        "B": [], 
+        "E": [], 
+        "D": [], 
+        "G": [], 
+        "F": [], 
+        "I": [], 
+        "H": [], 
+        "K": [ "power" ], 
+        "J": [ "power" ], 
+        "M": [ "power" ], 
+        "L": [ "power" ]
     }
 }
 ```
@@ -90,9 +171,7 @@ class User(graph.Node):
     def is_coached_by(self):
         """Return the set of users this user is coached by"""
         return self.incoming()
-
 ```
-
 
 ## Total Infection
 
@@ -152,32 +231,59 @@ A few design decisions are made:
   add a component and remain within the range.
 * If infecting whole components does not get within
   the desired range of infected users, 
-  then partial infections will take place.
-  Partial infections start with coaches and ignore transitivity 
+  then class infections will take place.
+  Class infections start with coaches and ignore transitivity 
   and "is coached by" relationships until
   getting within the range is achieved 
   or it is determined to not be possible.
-  Partial infections aim to keep individual classes in sync.
+  Class infections aim to keep individual classes in sync.
   It is assumed that a user with two coaches is in two different
   classes, and that a user that is both a coach and being coached
   has those relationships in two different classes.
   Users may be more accepting of different features in different classes.
 * If it is not possible to infect an acceptable range of users,
-  by first infecting whole components then employing partial infection,
+  by first infecting whole components then employing class infection,
   the function will not perform the infection and fail.
   This may fail, even though partial infection on its own could succeed.
 
 ```python
-def limited_infection(graph, feature, min_users, max_users):
-    """Infect close to a given number of users in the coaching graph."""
+def limited_infection(coaching_graph, feature, min_users, max_users):
+    """Perform a limited infection, between minimum and maximum users.
+
+    Limited infections first infect entire components then infect
+    classes, starting with coaches and their students (ignoring
+    transitivity and "is coached by" relationships). If a limited infection
+    exists between the minimum and maximum number of users (inclusive), 
+    it will be performed.
+    
+    Returns True if the infection was successful, False otherwise.
+    """
+
+    users = approx_component_infection(coaching_graph, min_users, max_users)
+    if len(users) < min_users:
+        # Component infection didn't infect enough users. Move to class
+        # infections.
+        seeds = coaching_graph.all_parents() | coaching_graph.all_singletons()
+        seeds -= users # Remove already infected users.
+        min_class_users = min_users - len(users)
+        max_class_users = max_users - len(users)
+        class_users = approx_class_infection(coaching_graph, seeds, 
+                min_class_users, max_class_users)
+        users |= class_users
+
+    if len(users) >= min_users:
+        for user in users:
+            user.update_feature(feature)
+        return True
+
+    return False
 ```
 
-We could employ the rules of partial infection all the time,
+### Other Limited Infection Approaches
+
+We could employ the rules of class infection all the time,
 and try prioritizing classes through transitivity and "is coached by"
 relationships, to try to fill in whole components first.
-
-Rather than keep a queue of all nodes, only queue up coaches. (What about
-singletons? Treat them as coaches, maybe.)
 
 ## Optional: Exact Limited Infection
 
@@ -208,16 +314,24 @@ when the sum of their sizes equals
 the desired number of infected users.
 This naive approach is implemented using recursion
 in the code below.
+The recursive implementation should use less memory
+than trying the approximate subset sum
+with the same minimum and maximum number of users,
+since only a single combination of components is
+in memory at a given time.
 
 ```python
-def subset_sum(sizes, target, i, n, subtotal):
+def exact_subset_sum(sizes, target, i, n, subtotal):
     """Solve the subset sum problem recursively."""
     if subtotal == target:
         return [i]
+    elif subtotal > target:
+        # Optimization. Stop considering this possible solution.
+        return False
 
     j = i + 1
     while j < n:
-        ret = subset_sum(sizes, target, j, n, subtotal + sizes[j])
+        ret = exact_subset_sum(sizes, target, j, n, subtotal + sizes[j])
         if ret != False:
             if i > -1:
                 ret.append(i)
@@ -226,22 +340,33 @@ def subset_sum(sizes, target, i, n, subtotal):
 
     return False
 
-def exact_limited_infection(coaching_graph, num_users, feature):
+def exact_limited_infection(coaching_graph, feature, num_users):
     """Infect a specified number of users exactly in a coaching graph."""
     components = coaching_graph.all_connected_components()
     sizes = [len(x) for x in components]
-    solution = subset_sum(sizes, num_users, -1, len(sizes), 0)
+    solution = exact_subset_sum(sizes, num_users, -1, len(sizes), 0)
     if solution != False:
         for i in solution:
             for user in components[i]:
-                user.add_feature(feature)
+                user.update_feature(feature)
         return True
     else:
         return False
 ```
 
 ## Possible Improvements
+Some improvements to the project submission provided include:
 
-* The recursive subset sum implementation could be modified to use
-  tail recursion, where in some languages this could be optimized
-  for performance and more efficient stack usage.
+* A more exhaustive set of unit tests, particularly for the graph routines.
+* Additional error handling and recovery. Currently there are no checks
+  for badly formed graphs, minimum and maximum users in the right order,
+  and other "sad path" types of behavior.
+* More optimization for the approximate and exact subset sum implementations.
+  For the exact subset sum, heuristics might be useful for picking more
+  favorable components to add in next, for example. This still doesn't
+  improve worst case performance, but could impact average case.
+* Better memory usage throughout.
+* General code cleanup to be more readable and consistent in thought.
+* Return more than one approximate or exact infection if they exist. This
+  has added overhead though, and is not likely to be useful in large scale
+  settings.
