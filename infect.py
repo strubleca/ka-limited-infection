@@ -38,7 +38,7 @@ class User(graph.Node):
         return self.incoming()
 
 def total_infection(coaching_graph, initial_user_id, feature):
-    """Totally infect a coaching graph with a feature from the initial user"""
+    """Totally infect a coaching graph component with a feature"""
     infected = coaching_graph.connected_component(initial_user_id)
     discard = feature.startswith("!")
     for user in infected:
@@ -46,6 +46,35 @@ def total_infection(coaching_graph, initial_user_id, feature):
             user.discard_feature(feature[1:]) # strip the leading !
         else:
             user.add_feature(feature)
+
+def subset_sum(sizes, target, i, n, subtotal):
+    """Solve the subset sum problem recursively."""
+    if subtotal == target:
+        return [i]
+
+    j = i + 1
+    while j < n:
+        ret = subset_sum(sizes, target, j, n, subtotal + sizes[j])
+        if ret != False:
+            if i > -1:
+                ret.append(i)
+            return ret
+        j = j + 1
+
+    return False
+
+def exact_limited_infection(coaching_graph, num_users, feature):
+    """Infect a specified number of users exactly in a coaching graph."""
+    components = coaching_graph.all_connected_components()
+    sizes = [len(x) for x in components]
+    solution = subset_sum(sizes, num_users, -1, len(sizes), 0)
+    if solution != False:
+        for i in solution:
+            for user in components[i]:
+                user.add_feature(feature)
+        return True
+    else:
+        return False
 
 def json_graph_to_coaching_graph(graph_file):
     """Convert JSON encoded graph to a coaching graph."""

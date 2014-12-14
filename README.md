@@ -131,3 +131,80 @@ have a feature or not. However, that might not always be possible.
 def limited_infection(graph, feature, num_users, tolerance):
     """Infect close to a given number of users in the coaching graph."""
 ```
+
+Some requirements for limited infection:
+* If the number of users to infect is > 0, then at least some users
+  must be infected.
+
+Some options for limited infection:
+
+* Find all connected components. Search for the collection of
+  components that gets closest to the desired number.
+* Find all components. If the smallest component is larger than the
+  number of users, consider breaking up classes.
+
+## Optional: Exact Limited Infection
+
+One of the optional assignments is to
+
+> write a version of `limited_infection` that infects *exactly* the number
+of users specified and fails if that's not possible (this can be (really)
+slow)
+
+This assignment is essentially a form of the 
+(subset sum problem)[http://en.wikipedia.org/wiki/Subset_sum_problem],
+where the multiset of integers consists
+of the sizes of the connected components
+and -1 times the number of users specified. For example,
+if the component sizes are 1, 2, and 3 and the number of desired users
+to infect is 4, the subset sum problem would be to find a
+non-empty subset of {1, 2, 3, -4} that totals to 0.
+This is known to be NP-complete,
+meaning no polynomial time algorithm
+for all inputs is known to exist.
+
+It is possible to solve though, 
+with one naive approach being
+to enumerate all possible subsets
+of the connected components and stopping
+when the sum of their sizes equals
+the desired number of infected users.
+This naive approach is implemented using recursion
+in the code below.
+
+```python
+def subset_sum(sizes, target, i, n, subtotal):
+    """Solve the subset sum problem recursively."""
+    if subtotal == target:
+        return [i]
+
+    j = i + 1
+    while j < n:
+        ret = subset_sum(sizes, target, j, n, subtotal + sizes[j])
+        if ret != False:
+            if i > -1:
+                ret.append(i)
+            return ret
+        j = j + 1
+
+    return False
+
+def exact_limited_infection(coaching_graph, num_users, feature):
+    """Infect a specified number of users exactly in a coaching graph."""
+    components = coaching_graph.all_connected_components()
+    sizes = [len(x) for x in components]
+    solution = subset_sum(sizes, num_users, -1, len(sizes), 0)
+    if solution != False:
+        for i in solution:
+            for user in components[i]:
+                user.add_feature(feature)
+        return True
+    else:
+        return False
+```
+
+## Possible Improvements
+
+* The recursive subset sum implementation could be modified to use
+  tail recursion, where in some languages this could be optimized
+  for performance and more efficient stack usage.

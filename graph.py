@@ -130,9 +130,22 @@ class Graph(object):
         node_queue.append(start) # Initialize with starting node
         while len(node_queue) > 0:
             current_node = node_queue.popleft()
-            connected.append(current_node)
             if not current_node.visited():
+                connected.append(current_node)
                 node_queue.extend(current_node.neighbors())
                 current_node.set_visited(True)
 
         return connected
+
+    def all_connected_components(self):
+        """Return an list of lists, each list containing a component."""
+
+        ids = set(self._nodes.keys())
+        components = []
+        while len(ids) > 0:
+            starting_id = ids.pop()
+            component = self.connected_component(starting_id)
+            ids -= set([x.id() for x in component])
+            components.append(component)
+
+        return components
