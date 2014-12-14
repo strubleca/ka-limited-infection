@@ -1,8 +1,22 @@
 ###############################################################################
+# Basic directed graph ADT
 ###############################################################################
-"""Basic directed graph ADT"""
+
+#------------------------------------------------------------------------------
+# Various informative variables for documentation.
+#------------------------------------------------------------------------------
+__author__  = 'Craig Struble <strubleca@yahoo.com>'
+__date__    = 'December 13, 2014'
+__version__ = '1'
+
+#------------------------------------------------------------------------------
+# Imports
+#------------------------------------------------------------------------------
 from collections import deque
 
+#------------------------------------------------------------------------------
+# Node implementation
+#------------------------------------------------------------------------------
 class Node(object):
     """A representation of directed graph nodes."""
 
@@ -68,6 +82,9 @@ class Node(object):
         """Return whether or not this node has no neighbors"""
         return len(self.neighbors()) == 0
 
+#------------------------------------------------------------------------------
+# Graph implementation
+#------------------------------------------------------------------------------
 class Graph(object):
     """A representation of graphs as a collection of nodes."""
 

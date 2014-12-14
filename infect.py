@@ -1,15 +1,25 @@
-###
-# For Documentation
-###
+###############################################################################
+# Infect coaching graphs in a variety of ways.
+###############################################################################
+
+#------------------------------------------------------------------------------
+# Various informative variables for documentation.
+#------------------------------------------------------------------------------
 __author__  = 'Craig Struble <strubleca@yahoo.com>'
 __date__    = 'December 13, 2014'
 __version__ = '1'
 
+#------------------------------------------------------------------------------
+# Imports
+#------------------------------------------------------------------------------
 import graph # Our basic graph implementation
 import json
 from collections import deque
 from argparse import ArgumentParser
 
+#------------------------------------------------------------------------------
+# User Model
+#------------------------------------------------------------------------------
 class User(graph.Node):
     """Model users as graph nodes with some special methods."""
 
@@ -45,6 +55,9 @@ class User(graph.Node):
         """Return the set of users this user is coached by"""
         return self.incoming()
 
+#------------------------------------------------------------------------------
+# Functions for performing infections
+#------------------------------------------------------------------------------
 def total_infection(coaching_graph, feature, initial_user_id):
     """Totally infect a coaching graph component with a feature"""
     infected = coaching_graph.connected_component(initial_user_id)
@@ -186,6 +199,9 @@ def exact_limited_infection(coaching_graph, feature, num_users):
     else:
         return False
 
+#------------------------------------------------------------------------------
+# Input output functions
+#------------------------------------------------------------------------------
 def json_file_to_coaching_graph(graph_file):
     """Convert JSON encoded graph to a coaching graph."""
     graph_data = json.load( open(graph_file) )
@@ -209,7 +225,7 @@ def json_file_to_coaching_graph(graph_file):
         features = graph_data["features"]
         for user_id in features.keys():
             user = coaching_graph.find_node(user_id)
-            for feature in features.values():
+            for feature in features[user_id]:
                 user.add_feature(feature)
 
     return coaching_graph
@@ -261,8 +277,9 @@ def main(args):
 
     coaching_graph_to_json_file(coaching_graph, args.outfilename)
 
-
-# Execute main script if this file is called for execution
+#------------------------------------------------------------------------------
+# Main script
+#------------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = ArgumentParser(description="Infect a coaching graph.")
     parser.add_argument('feature', 

@@ -2,10 +2,23 @@
 # Unit tests for graph and infection code.
 ###############################################################################
 
+#------------------------------------------------------------------------------
+# Various informative variables for documentation.
+#------------------------------------------------------------------------------
+__author__  = 'Craig Struble <strubleca@yahoo.com>'
+__date__    = 'December 13, 2014'
+__version__ = '1'
+
+#------------------------------------------------------------------------------
+# Imports
+#------------------------------------------------------------------------------
 import graph
 import infect
 import unittest
 
+#------------------------------------------------------------------------------
+# Unit tests
+#------------------------------------------------------------------------------
 class TestGraphFunctions(unittest.TestCase):
     """Unit testing of basic graph functionality."""
 
@@ -78,7 +91,6 @@ class TestGraphFunctions(unittest.TestCase):
         # Make sure not to find nodes not in the graph
         with self.assertRaises(KeyError) as cm:
                 graph1.find_node("X")
-
 
     # TODO(strubleca@yahoo.com): Add more unit tests for graph functions.
 

@@ -21,8 +21,11 @@ The code was written in Python using Python v2.7.8. The files are
 * `graph.py` general graph routines.
 * `infect.py` infection routines and main script.
 * `infect_test.py` unit tests for graph and infection routines.
+* `randomgraph.py` generates random coaching graphs with a class oriented
+  structure.
 * `graphs/*.json` sample coaching graphs
 
+### Infecting graphs
 The usage message for `infect.py` is
 
 ```
@@ -59,6 +62,42 @@ python infect.py -l 4 8 exam graphs/graph2.json graphs/infected2.json
 python infect.py -e 9 prize graphs/graph3.json graphs/infected3.json
 ```
 
+### Creating Random Graphs
+
+A small utility `randomgraph.py` was written to create random 
+coaching graphs. Graphs are class oriented with a chosen probability
+of including existing users in new classes. The implementation is very
+rough and resulting graphs are not completely guaranteed to be within
+the given parameters, but should be close.
+
+The usage message is
+
+```
+usage: randomgraph.py [-h]
+                      outfilename NUM_CLASS MIN_SIZE MAX_SIZE EXISTING_RATE
+
+Generate a random coaching graph.
+
+positional arguments:
+  outfilename    output file containing infected graph
+  NUM_CLASS      number of classes to create
+  MIN_SIZE       minimum number of students in a class
+  MAX_SIZE       maximum number of students in a class
+  EXISTING_RATE  rate of existing users to place in a class
+
+optional arguments:
+  -h, --help     show this help message and exit
+```
+
+A sample execution to create 10 classes with between 10 and 30
+students per class and a 5% chance of including existing students
+is:
+
+```bash
+python randomgraph.py graphs/randomgraph.json 10 10 30 0.05
+```
+
+### Running Tests
 To run the unit tests:
 
 ```bash
@@ -357,6 +396,7 @@ def exact_limited_infection(coaching_graph, feature, num_users):
 ## Possible Improvements
 Some improvements to the project submission provided include:
 
+* More output to indicate progress.
 * A more exhaustive set of unit tests, particularly for the graph routines.
 * Additional error handling and recovery. Currently there are no checks
   for badly formed graphs, minimum and maximum users in the right order,
@@ -370,3 +410,24 @@ Some improvements to the project submission provided include:
 * Return more than one approximate or exact infection if they exist. This
   has added overhead though, and is not likely to be useful in large scale
   settings.
+* Use a more standard graph package. The choice was made not to do so
+  to illustrate problem solving skills and expediency.
+* Use more standard graph file representation. The choice of JSON was
+  again for expediency and simple access to Python's `json` package.
+
+## Time Taken
+
+About 12 hours was taken 
+to implement the infection routines,
+basic graph implementation,
+random graph generation,
+unit tests and examples,
+and write the documentation.
+
+An additional XX hours 
+was used to implement the visualization,
+above and beyond the requirements.
+This was done primarily out
+of personal interest 
+to see the graphs and effects
+of infections at larger scale.
