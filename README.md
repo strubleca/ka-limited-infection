@@ -233,15 +233,11 @@ As a slight extension, if a feature starts with an exclamation point (!),
 the infection discards the feature.
 
 ```python
-def total_infection(coaching_graph, initial_user_id, feature):
-    """Totally infect a coaching graph with a feature from the initial user"""
+def total_infection(coaching_graph, feature, initial_user_id):
+    """Totally infect a coaching graph component with a feature"""
     infected = coaching_graph.connected_component(initial_user_id)
-    discard = feature.startswith("!")
     for user in infected:
-        if discard:
-            user.discard_feature(feature[1:]) # strip the leading !
-        else:
-            user.add_feature(feature)
+        user.update_feature(feature)
 ```
 
 ## Limited Infection
