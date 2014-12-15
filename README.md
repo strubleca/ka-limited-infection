@@ -265,7 +265,7 @@ have a feature or not. However, that might not always be possible.
 
 A few design decisions are made:
 * An acceptable range of users to infect is specified. It is assumed
-  the minimum and maximum number of users is provided correctly.
+  the minimum and maximum numbers of users are provided correctly.
 * Infecting whole components first is desirable. This keeps all coaches
   and students in sync with their feature sets. This process continues
   until the acceptable range is achieved or it is not possible to
