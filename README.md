@@ -408,7 +408,19 @@ as powers of 2 greater than 0 when infecting coaching graphs.
 This way, when added together, they form a bit vector encoding
 the combination of features each user has.
 
+Usage for `drawgraph.py` is
+
 ```
+usage: drawgraph.py [-h] infilename outfilename
+
+Draw a coaching graph.
+
+positional arguments:
+  infilename   input file containing coaching graph
+  outfilename  output file containing graph drawing
+
+optional arguments:
+  -h, --help   show this help message and exit
 ```
 
 The following example below performs two total infections and
