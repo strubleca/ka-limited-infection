@@ -18,12 +18,14 @@ sets otherwise.
 
 The code was written in Python using Python v2.7.8. The files are
 
+* `drawgraph.py` draw a coaching graph. Requires `graph-tool` and `matplotlib`.
 * `graph.py` general graph routines.
 * `infect.py` infection routines and main script.
 * `infect_test.py` unit tests for graph and infection routines.
 * `randomgraph.py` generates random coaching graphs with a class oriented
   structure.
 * `graphs/*.json` sample coaching graphs
+* `figures/*.png` visualizations of the graphs
 
 ### Infecting graphs
 The usage message for `infect.py` is
@@ -103,6 +105,10 @@ To run the unit tests:
 ```bash
 python infect_test.py
 ```
+
+### Visualizing Graphs
+
+See the *Optional: Graph Visualization* below for details.
 
 ## Coaching Graph Files
 
@@ -393,6 +399,45 @@ def exact_limited_infection(coaching_graph, feature, num_users):
         return False
 ```
 
+## Optional: Graph Visualization
+
+This second optional implementation was written beyond the 12 hour
+time limit and shouldn't be considered other than just as my personal
+interest in visualizing the results. The graph visualization uses
+the (graph-tool)[http://graph-tool.skewed.de/] package for Python
+as well as `matplotlib` for plotting.
+
+To make the best use of this, features are assumed to be encoded
+as powers of 2 greater than 0 when infecting coaching graphs.
+This way, when added together, they form a bit vector encoding
+the combination of features each user has.
+
+```
+```
+
+The following example below performs two total infections and
+a limited infection on the small two component example graph
+in the repository. This illustrates how to visualize mixtures
+of features.
+
+```bash
+python infect.py -t A 1 graphs/graph3.json graphs/infected3.json
+python infect.py -t J 2 graphs/infected3.json graphs/infected3.json
+python infect.py -l 5 8 4 graphs/infected3.json graphs/infected3.json
+python drawgraph.py graphs/infected3.json figures/infected3.png
+```
+
+The output from these commands is shown in the following figure.
+
+![graph3 infected](figures/infected3.png)
+
+### Visualization Note
+
+Unfortunately, the current tool does not maintain graph locations
+across graphs. This makes it difficult to incrementally see the impact
+of infecting the graph with multiple steps. This feature is 
+something to add in the future.
+
 ## Possible Improvements
 Some improvements to the project submission provided include:
 
@@ -411,7 +456,8 @@ Some improvements to the project submission provided include:
   has added overhead though, and is not likely to be useful in large scale
   settings.
 * Use a more standard graph package. The choice was made not to do so
-  to illustrate problem solving skills and expediency.
+  to keep the solution self sufficient, illustrate problem solving skills
+  and expediency.
 * Use more standard graph file representation. The choice of JSON was
   again for expediency and simple access to Python's `json` package.
 
@@ -424,7 +470,7 @@ random graph generation,
 unit tests and examples,
 and write the documentation.
 
-An additional XX hours 
+An additional hour 
 was used to implement the visualization,
 above and beyond the requirements.
 This was done primarily out
